@@ -1,0 +1,36 @@
+# 硬件测试工具配置文件示例
+# 使用方法: 将此文件复制为 config.toml 并修改相应参数
+
+# RFID 读写器配置
+[rfid]
+host = "192.168.1.100"
+port = 8086
+antennas = [1, 2, 3, 4]
+
+# 锁控板配置
+[lock]
+# 连接类型: "serial" 或 "socket"
+type = "socket"
+# Socket 连接配置
+host = "192.168.1.101"
+port = 8080
+# 串口连接配置 (当 type = "serial" 时使用)
+# serial_port = "/dev/ttyUSB0"
+# baud_rate = 9600
+
+# 串口屏配置
+[screen]
+# 连接类型: "serial" 或 "socket"
+type = "socket"
+# Socket 连接配置
+host = "192.168.1.102"
+port = 8081
+# 串口连接配置 (当 type = "serial" 时使用)
+# serial_port = "/dev/ttyUSB1"
+# baud_rate = 115200
+
+# 读卡器配置
+[cardreader]
+# USB VID 和 PID (十六进制)
+vid = 0x1234
+pid = 0x5678
