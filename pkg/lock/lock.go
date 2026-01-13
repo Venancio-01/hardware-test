@@ -219,9 +219,13 @@ func (c *Controller) QueryAll() ([]LockStatus, error) {
 
 	var allStatus []LockStatus
 
-	// 查询 1-8 号板（假设最大8个板）
 	for boardAddr := 1; boardAddr <= 8; boardAddr++ {
 		cmd := generateQueryAllCommand(boardAddr)
+
+		if c.serialConn != nil {
+			c.serialConn.Flush()
+		}
+
 		_, err := c.Write(cmd)
 		if err != nil {
 			return nil, fmt.Errorf("查询板地址 %d 失败: %w", boardAddr, err)
@@ -229,24 +233,38 @@ func (c *Controller) QueryAll() ([]LockStatus, error) {
 
 		time.Sleep(50 * time.Millisecond)
 
-		// 读取响应
-		if c.serialConn != nil {
-			c.serialConn.Flush()
-		} else if c.socketConn != nil {
-			c.socketConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		if c.socketConn != nil {
+			c.socketConn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		}
 
 		buf := make([]byte, 256)
-		n, err := c.Read(buf)
-		if err != nil {
-			return nil, fmt.Errorf("读取板地址 %d 响应失败: %w", boardAddr, err)
+		totalRead := 0
+
+		for {
+			n, err := c.Read(buf[totalRead:])
+			if err != nil {
+				if err.Error() == "EOF" && totalRead > 0 {
+					break
+				}
+				return nil, fmt.Errorf("读取板地址 %d 响应失败: %w", boardAddr, err)
+			}
+
+			if n == 0 {
+				break
+			}
+
+			totalRead += n
+
+			if totalRead >= len(buf) {
+				break
+			}
 		}
 
-		if n > 0 {
+		if totalRead > 0 {
 			status := LockStatus{
 				BoardAddr: boardAddr,
-				Data:      buf[:n],
-				Length:    n,
+				Data:      buf[:totalRead],
+				Length:    totalRead,
 			}
 			allStatus = append(allStatus, status)
 		}
