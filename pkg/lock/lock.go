@@ -16,6 +16,13 @@ const (
 	TypeSocket ConnectionType = "socket"
 )
 
+// LockStatus 锁状态
+type LockStatus struct {
+	BoardAddr int
+	Data      []byte
+	Length    int
+}
+
 // Controller 锁控板控制器
 type Controller struct {
 	connType    ConnectionType
@@ -179,6 +186,13 @@ func generateQueryCommand() []byte {
 	return generateCommand("80010033")
 }
 
+// generateQueryAllCommand 生成查询所有锁状态命令
+func generateQueryAllCommand(boardAddr int) []byte {
+	boardHex := fmt.Sprintf("%02X", boardAddr)
+	hexCmd := "80" + boardHex + "01"
+	return generateCommand(hexCmd)
+}
+
 // generateOpenCommand 生成开锁命令
 func generateOpenCommand(boardAddr, lockAddr int) []byte {
 	boardHex := fmt.Sprintf("%02X", boardAddr)
@@ -195,6 +209,50 @@ func (c *Controller) Query() error {
 	cmd := generateQueryCommand()
 	_, err := c.Write(cmd)
 	return err
+}
+
+// QueryAll 查询所有锁的状态（每个板地址查询一次）
+func (c *Controller) QueryAll() ([]LockStatus, error) {
+	if !c.isConnected {
+		return nil, fmt.Errorf("未连接")
+	}
+
+	var allStatus []LockStatus
+
+	// 查询 1-8 号板（假设最大8个板）
+	for boardAddr := 1; boardAddr <= 8; boardAddr++ {
+		cmd := generateQueryAllCommand(boardAddr)
+		_, err := c.Write(cmd)
+		if err != nil {
+			return nil, fmt.Errorf("查询板地址 %d 失败: %w", boardAddr, err)
+		}
+
+		time.Sleep(50 * time.Millisecond)
+
+		// 读取响应
+		if c.serialConn != nil {
+			c.serialConn.Flush()
+		} else if c.socketConn != nil {
+			c.socketConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		}
+
+		buf := make([]byte, 256)
+		n, err := c.Read(buf)
+		if err != nil {
+			return nil, fmt.Errorf("读取板地址 %d 响应失败: %w", boardAddr, err)
+		}
+
+		if n > 0 {
+			status := LockStatus{
+				BoardAddr: boardAddr,
+				Data:      buf[:n],
+				Length:    n,
+			}
+			allStatus = append(allStatus, status)
+		}
+	}
+
+	return allStatus, nil
 }
 
 // Open 打开指定的锁

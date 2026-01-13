@@ -177,7 +177,34 @@ func testLock(host string, port int, serialPort string, baudRate int) (bool, err
 		fmt.Printf("连接锁控板 (串口): %s (波特率: %d)\n", serialPort, baudRate)
 	}
 
-	return controller.TestConnection()
+	success, err := controller.TestConnection()
+	if !success {
+		return false, err
+	}
+
+	if err := controller.Connect(); err != nil {
+		return false, err
+	}
+	defer controller.Disconnect()
+
+	allStatus, err := controller.QueryAll()
+	if err != nil {
+		return false, err
+	}
+
+	fmt.Printf("\n========== 锁状态报告 ==========\n")
+	for _, status := range allStatus {
+		fmt.Printf("板地址: 0x%02X\n", status.BoardAddr)
+		fmt.Printf("  命令长度: %d 字节\n", status.Length)
+		fmt.Printf("  原始数据: %X\n", status.Data)
+		fmt.Printf("  十六进制: ")
+		for _, b := range status.Data {
+			fmt.Printf("%02X ", b)
+		}
+		fmt.Println()
+	}
+
+	return true, nil
 }
 
 func testScreen(host string, port int, serialPort string, baudRate int) (bool, error) {
